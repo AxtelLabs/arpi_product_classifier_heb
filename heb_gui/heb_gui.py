@@ -1,11 +1,18 @@
+#Hi 
+
 import tkinter as tk                # python 3
 from tkinter import font  as tkfont # python 3
 import PIL.Image, PIL.ImageTk
 import cv2
 from playsound import playsound
+from PIL import Image, ImageTk
+from tkinter.ttk import Frame, Label, Style
+import pyautogui
 #import Tkinter as tk     # python 2
 #import tkFont as tkfont  # python 2
-path = "C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\"
+path = "C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs"
+
+#"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\"
 #suggestions = ["potato","mango","banana"]
 prodDB = { "avocado":{"name":"Aguacate","PLU":"2660"},
             "banana":{"name":"Platano","PLU":"2661"},
@@ -28,9 +35,9 @@ prodDB = { "avocado":{"name":"Aguacate","PLU":"2660"},
             "tomato":{"name":"Tomate","PLU":"2678"},
             "zucchini":{"name":"Calabacita","PLU":"2679"}}
 prodDict = {
-            0:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"},
-            1:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"},
-            2:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"}
+            0:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"},
+            1:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"},
+            2:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"}
 }
 class App(tk.Tk):
 
@@ -220,9 +227,9 @@ class StartPage(tk.Frame):
                     #self.vid.__class__release()
                     print("Nuevo producto en bascula")
                     self.newProdFlg = True
-                    cv2.imwrite("C:\\imgs\\full\\image" + str(self.i) + ".png", frame)
+                    #cv2.imwrite("C:\\imgs\\full\\image" + str(self.i) + ".png", frame)
                     self.i += 1
-                    self.controller.show_frame("PageOne")
+                    #self.controller.show_frame("PageOne")
                     #self.counter = 0
 
                 else:
@@ -250,13 +257,13 @@ class PageOne(tk.Frame):
         self.controller = controller
         self.suggestions = ["potato","mango","banana"]
         self.prodDict = {
-            0:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"},
-            1:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"},
-            2:{"name":"avocado", "PLU":"XXXX", "path":"C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\avocado.png"}
+            0:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"},
+            1:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"},
+            2:{"name":"avocado", "PLU":"XXXX", "path":"C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/avocado.png"}
         }
         HEIGHT = self.master.winfo_screenwidth()
         WIDTH = self.master.winfo_screenheight()
-        self.path = path = "C:\\Users\\Hernan Martinez\\Documents\\Axtel\\1_Projects\\03_HEB\\02_code\\GUI_HEB\\test\\imgs\\"
+        self.path = path = "C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/"
         # label = tk.Label(self, text="This is page 1", font=controller.title_font)
         # label.pack(side="top", fill="x", pady=10)
         # button = tk.Button(self, text="Go to the start page",
@@ -325,6 +332,7 @@ class PageOne(tk.Frame):
 
         self.prodInfo = self.getProdInfo(self.suggestions,self.prodDict)
         print(self.prodInfo)
+
         # Main Suggestion
         self.option1= PIL.Image.open(self.prodInfo[0]["path"])
         self.option1= self.option1.resize((270,270), PIL.Image.ANTIALIAS)
@@ -406,13 +414,91 @@ class PageOne(tk.Frame):
 class PageTwo(tk.Frame):
 
     def __init__(self, parent, controller):
+        global suggestions
         tk.Frame.__init__(self, parent)
-        self.controller = controller
+        HEIGHT = self.master.winfo_screenwidth()
+        WIDTH = self.master.winfo_screenheight()
+        self.path = path = "C:/Users/lenovo/Documents/pr_asanchez/P01_HEB/GUI/DEMO HEB/heb_gui/imgs/"
+        
+        
+        # Add canvas to frame
+        self.can = tk.Canvas(self, width=self.winfo_screenwidth(), height=self.winfo_screenheight(), bg='#ffffff')
+        self.can.place(relx=0, rely=0 ,relwidth=1, relheight=1)
+
+        ## BACKGROUND
+        # Import images
+        self.img= PIL.Image.open("imgs/transparent.png")
+        self.img= self.img.resize((170,100), PIL.Image.ANTIALIAS)
+        self.img= PIL.ImageTk.PhotoImage(self.img)
+        self.img2= PIL.Image.open("imgs/background.jpg")
+        self.img2= self.img2.resize((3840,2160), PIL.Image.ANTIALIAS)
+        self.img2= PIL.ImageTk.PhotoImage(self.img2)
+        self.can2 = tk.Canvas(self, width=WIDTH/2, height=HEIGHT, bg='#000000')
+        self.can2.place(relx=0.5, rely=0 ,relwidth=1, relheight=1)
+
+        # Insert fruit background
+        self.can2.create_image(500,500, image=self.img2)
+
+        # HEB logo
+        self.logoRaw= PIL.Image.open("imgs/logo.png")
+        self.logoRaw= self.logoRaw.resize((210,70), PIL.Image.ANTIALIAS)
+        self.logo= PIL.ImageTk.PhotoImage(self.logoRaw)
+        self.label1= tk.Label(self, background= "#ffffff", image= self.logo)
+        self.label1.place (relx=-0.03, rely=.02, relwidth= .2, relheight=.07)
+        self.label1.image=self.logo
+
+        #Instructions 1 P3
+        self.uno= PIL.Image.open("imgs/2.png")
+        self.uno= self.uno.resize((750,300), Image.ANTIALIAS)
+        self.unore= PIL.ImageTk.PhotoImage(self.uno)
+        self.label2= tk.Label(self, background="#FFFFFF", image= self.unore)
+        self.label2.place(relx=0.05, rely=0.04, relwidth= 0.25, relheight=.20)
+        self.label2.image= self.unore
+
+
+        #Label- video 
+        self.label3= tk.Label(self, background= "#ADADAD")
+        self.label3.place(relx=0.12, rely=.35, relwidth= .3, relheight=.33)
+
+
+        #Instructions 2 P3
+        self.dos= PIL.Image.open("imgs/recuerda.png")
+        self.dos= self.dos.resize((750,300), Image.ANTIALIAS)
+        self.dosre= PIL.ImageTk.PhotoImage(self.dos)
+        self.label3= tk.Label(self, background="#FFFFFF", image= self.dosre)
+        self.label3.place(relx=0.05, rely=0.65 ,relwidth=0.39, relheight=.15)
+        self.label3.image= self.dosre
+
+        self.e1= tk.Entry(self, bd= 1, background="#FFFFFF", foreground="#505050")
+        self.e1.place(relx=0.550, rely=0.20,relwidth=0.40, relheight=0.06)
+
+        # Instructions 3 P3
+        self.dos= PIL.Image.open("imgs/buscar.png")
+        self.dos= self.dos.resize((400,100), PIL.Image.ANTIALIAS)
+        self.dosre=PIL.ImageTk.PhotoImage(self.dos)
+        self.lastMsg = self.can2.create_image(500,130, image=self.dosre)
+        
+
+        # Search button
+        self.next= PIL.Image.open("imgs/Siguiente.jpg")
+        self.next= self.next.resize((300,60), PIL.Image.ANTIALIAS)
+        self.nextre=PIL.ImageTk.PhotoImage(self.next)
+        self.button1= tk.Button(self, background="#ffffff", image= self.nextre)
+        self.button1.place(relx=0.66, rely=0.55 ,relwidth=0.20, relheight=.06)
+        self.button1.image= self.nextre
+
+        
+
+
+        """self.controller = controller
         label = tk.Label(self, text="This is page 2", font=controller.title_font)
         label.pack(side="top", fill="x", pady=10)
         button = tk.Button(self, text="Go to the start page",
                            command=lambda: controller.show_frame("StartPage"))
-        button.pack()
+        button.pack()"""
+
+
+
 
 class MyVideoCapture:
     def __init__(self, video_source=0):
