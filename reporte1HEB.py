@@ -13,7 +13,7 @@ container_name = 'arpi'#"testDatabase"
 
 database = client.get_database_client(database_name)
 container = database.get_container_client(container_name)
-
+quit()
 # Enumerate the returned items
 for item in container.query_items(query='SELECT * FROM c'):
     print(json.dumps(item, indent=True))
