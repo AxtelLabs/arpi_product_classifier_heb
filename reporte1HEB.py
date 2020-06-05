@@ -140,7 +140,9 @@ def CreateReport(Dates):
     different_days = list(dict.fromkeys(Nformat2))
     print(different_days)
 
-    different_days = [None,None, None]+different_days
+    #count1 =
+
+    #different_days = [None,None, None]+different_days
 
     fig = plt.figure()
     fig.subplots_adjust(hspace=0.4, wspace=0.4)
@@ -148,7 +150,7 @@ def CreateReport(Dates):
     for i in range(1, 4):
         ax = fig.add_subplot(3, 1, i)
 
-        ax.set_xticklabels(different_days)
+        ax.set_xticklabels(different_days,fontdict={'horizontalalignment': 'center'})
         ax.plot()
         #ax.text(0.5, 0.5, str((3, 1, i)),
         #    fontsize=18, ha='center')
