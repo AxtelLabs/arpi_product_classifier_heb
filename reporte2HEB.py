@@ -15,7 +15,7 @@ except ImportError:
 from tkcalendar import Calendar, DateEntry
 
 url = 'https://cosmos-arpiheb-dev.documents.azure.com:443/' #os.environ['ACCOUNT_URI']
-key = 'xzvXRlcvgHViT47OJQEq2ylbwePcjf6ALJQRCYEg43yOFrnoPvIXwR4LKXZmTrZxGgiOJ4YenSPIGy4wRmgvhg=='
+key = 'xzvXRlcvgHViT47OJQEq2ylbwePcjf6ALJQRCYEg43yOFrnoPvIXwR4LKXZmTrZxGgiOJ4YenSPIGy4wRmgvhg==' #os.environ['ACCOUNT_KEY']
 client = CosmosClient(url, credential=key)
 
 database_name = 'arpi'#"testDatabase"

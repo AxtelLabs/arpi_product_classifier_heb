@@ -17,12 +17,15 @@ except ImportError:
 
 from tkcalendar import Calendar, DateEntry
 
-url = 'https://cosmos-arpiheb-dev.documents.azure.com:443/' #os.environ['ACCOUNT_URI']
-key = 'xzvXRlcvgHViT47OJQEq2ylbwePcjf6ALJQRCYEg43yOFrnoPvIXwR4LKXZmTrZxGgiOJ4YenSPIGy4wRmgvhg=='
+
+# Set up environment variables to the azure key and url
+url = os.environ['ACCOUNT_URI']
+key = os.environ['ACCOUNT_KEY']
 client = CosmosClient(url, credential=key)
 
-database_name = 'arpi'#"testDatabase"
-container_name = 'telemetry'#"testDatabase"
+# azure specifics
+database_name = 'arpi'
+container_name = 'telemetry'
 
 database = client.get_database_client(database_name)
 container = database.get_container_client(container_name)
@@ -30,7 +33,7 @@ container = database.get_container_client(container_name)
 Time = []
 Fruit  = []
 Percent  = []
-# Enumerate the returned items
+# Make queries
 
 for item in container.query_items(query='SELECT t.EventProcessedUtcTime FROM telemetry t',
     enable_cross_partition_query=True):
@@ -51,8 +54,6 @@ Nformat2 = [x.split('T')[0] for x in Time] # yy-mm-dd format
 days = [x.split('T')[0] for x in Nformat]
 
 times = [x.split('T')[1] for x in Time] 
-#print(Nformat2)
-
 times = [x[:8]for x in times ]# no decimal format for the seconds
 
 # List of the different years, months (removes all repeating entries)
@@ -65,7 +66,11 @@ different_times = list(dict.fromkeys(times))
 
 Dates = []
 
+
+# defining functions for tkinter
+
 def example1():
+    # function that prints selection and "forgets" calender
     def print_sel():
         print(cal.selection_get())
         date = cal.selection_get()
@@ -83,47 +88,51 @@ def example1():
     cal.pack(fill="both", expand=True)
     ok = ttk.Button(top, text="ok", command=print_sel)
     ok.pack(fill="both", expand=True)
-    
+    # function that creates the first report and closes the tkinter app
 def printList():
     CreateReport(Dates)
     root.destroy()
-
+    # function that creates the second report and closes the tkinter app
 def printList2():
     CreateReport2(Dates)
     root.destroy()
 
-
+# creates the first report
 def CreateReport(Dates):
-    Diff = Dates[1] - Dates[0]
-    Diff = [Dates[0]+timedelta(days=i) for i in range(Diff.days+1)]
-
-    def daterange(date1, date2):
-        for n in range(int ((date2 - date1).days)+1):
-            yield date1 + timedelta(n)
+    
     i = 0
-
+    # Gives all the days between the two selected dates
     rangeDates = [str(Dates[0] + timedelta(days=i)) for i in range((Dates[1]-Dates[0]).days + 1)]
 
     whut = []
+    # cycles through all the days between the two selected dates and retreives the date for each upload event
+
+    # saves the days where information was uploaded
+
     for i in rangeDates:
         for item in container.query_items(query='SELECT t.EventProcessedUtcTime FROM telemetry t WHERE CONTAINS(t.EventProcessedUtcTime, "{}")'.format(i),
             enable_cross_partition_query=True):
-            print(json.dumps(item, indent=True))
+            #print(json.dumps(item, indent=True))
             whut.append(json.dumps(item, indent=True))
     print()
-
+    # cleans the list of the above information
     Time = [x.replace('{\n "EventProcessedUtcTime": "', '').replace('Z"\n}','')  for x in whut]
-
+    # further cleans the information list
     Nformat2 = [x.split('T')[0] for x in Time]
     different_days = list(dict.fromkeys(Nformat2))
+
+    # takes the different days where information was uploaded to graph upon those dates
     print(different_days)
 
-
+    # counts the number of image uploads per user day
     counter1 = [sum('{}'.format(different_days[i]) in s for s in Nformat2) for i in range(len(different_days))]
     print()
     count = counter1
     print(count)
-    
+    # quadruple subplot
+
+    # first plots pictures/inferences per day
+
     fig = plt.figure()
     fig.subplots_adjust(hspace=1.0, wspace=0.4)
     fig.suptitle("Utlización del Nodo",fontsize=16)
@@ -144,18 +153,17 @@ def CreateReport(Dates):
 
     ax = fig.add_subplot(4, 1, 2)
 
+    # second plots use increment w.r.t the utilization day before
     ax.set_xticklabels(different_days)
     ax.set_title('Incremento (%) con respecto al día anterior')
     ax.plot(different_days, t1,fillstyle='full')
     for i, v in enumerate(t1):
-        #print(i, v)
         ax.text(i, v, "%d" %v, ha="center")
 
     
     whut = []
     for item in container.query_items(query='SELECT t.validationBoolean FROM telemetry t ',
         enable_cross_partition_query=True):
-        print(json.dumps(item, indent=True))
         whut.append(json.dumps(item, indent=True))
 
     valid = [x.replace('{\n "validationBoolean": ', '').replace('\n}','')  for x in whut]
@@ -163,6 +171,7 @@ def CreateReport(Dates):
 
     ax = fig.add_subplot(4, 1, 3)
 
+    # third plots precision based on the validation boolean
     t1 = [100 for i in range(len(different_days))]
     ax.set_xticklabels(different_days)
     ax.set_title('Precisión')
@@ -171,6 +180,7 @@ def CreateReport(Dates):
         ax.text(i, v, "%d" %v, ha="center")
 
 
+    # fourth plots the models accuracy based on network training/test
     ax = fig.add_subplot(4, 1, 4)
     t2 = random.uniform(90.0, 100.0) 
     t1 = [t2 for i in range(len(different_days))]
@@ -182,7 +192,7 @@ def CreateReport(Dates):
         ax.text(i, v, "%d" %v, ha="center")
 
     plt.show()
-
+# creates histogram of products detected as fruit 1 in each inference, by date range
 def CreateReport2(Dates):   
 
     rangeDates = [str(Dates[0] + timedelta(days=i)) for i in range((Dates[1]-Dates[0]).days + 1)]
@@ -191,7 +201,7 @@ def CreateReport2(Dates):
     for i in rangeDates:
         for item in container.query_items(query='SELECT t.fruit1 FROM telemetry t WHERE CONTAINS(t.EventProcessedUtcTime, "{}")'.format(i),
             enable_cross_partition_query=True):
-            print(json.dumps(item, indent=True))
+            #print(json.dumps(item, indent=True))
             whut.append(json.dumps(item, indent=True))
 
     whut = [x.replace('{\n "fruit1": ', '').replace('"\n}','')  for x in whut]
@@ -210,7 +220,7 @@ def CreateReport2(Dates):
     plt.show()
 
 
-
+# Tkinter main app buttons
 root = tk.Tk()
 s = ttk.Style(root)
 s.theme_use('clam') # clam, alt, default, classic
@@ -221,5 +231,5 @@ ttk.Button(root, text='Generar gráfica de uso', command=printList).pack(padx=5,
 ttk.Button(root, text='Generar histograma de productos', command=printList2).pack(padx=5, pady=15)
 
 
-
+# Mainloop
 root.mainloop()
