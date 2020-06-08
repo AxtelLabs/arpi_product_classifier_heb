@@ -19,7 +19,9 @@ from tkcalendar import Calendar, DateEntry
 
 
 # Set up environment variables to the azure key and url
-url = os.environ['ACCOUNT_URI']
+url = os.environ['ACCOUNT_URI'] 
+# azure account key
+# in cd ./bash_profile add
 key = os.environ['ACCOUNT_KEY']
 client = CosmosClient(url, credential=key)
 
