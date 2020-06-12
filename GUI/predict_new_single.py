@@ -20,7 +20,7 @@ def singleInference(img,model,k):
     path = dash.join(os.path.realpath(__file__).split(dash)[:-1]) + dash
 
     #model.compile(loss='categorical_crossentropy',optimizer='rmsprop',metrics=['accuracy'])
-    valid_directory =path + "classes"
+    valid_directory =path + "new_classes"
     w= [x[0] for x in os.walk(valid_directory)]
     del w[0]
 

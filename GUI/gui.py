@@ -41,32 +41,37 @@ from playsound import playsound
 import uuid
 import os
 import sys
-###from azure.iot.device import IoTHubDeviceClient # <-- Final GUI change
+from azure.iot.device import IoTHubDeviceClient 
 #sys.path.insert(0,r'C:\Users\AxtelUser\Documents\ARPI\avir-cloud-azure-client')
 import ScheduleTask
-### import SendDeviceToCloudMessage as D2C # <-- Final GUI change
+import SendDeviceToCloudMessage as D2C
 import warnings # Used to remove tensorflow warnings
 import predict_new_single
+import predict_new_product
 from tensorflow.keras.models import load_model
 #from keras.models import load_model
 from test import GetDict
 import platform # platform.system() prints Linux, Darwin (Mac) or Windows.
 import time
 import pandas as pd
+import getList
+import tkstuff_4
 
 
 
 # Establish the environment variables
 arpi_node_connection_string = os.getenv('ARPI_NODE_CONNECTION_STRING')
+ARPI_name = os.getenv("ACC_NAME")
 ARPI_path_image_folder = os.getenv('IMG_PATH')
-schedule_action = os.getenv('ARPI_SCHEDULE_ACTION')
-schedule_arguments = os.getenv('ARPI_SCHEDULE_ARGUMENTS')
+print(ARPI_path_image_folder) 
+# schedule_action = os.getenv('ARPI_SCHEDULE_ACTION') # Needed for image upload but not for telemetry
+#scheKCdule_arguments = os.getenv('ARPI_SCHEDULE_ARGUMENTS') # Needed for image upload but not for telemetry
 
 
 # Establish the client strings
-### client = IoTHubDeviceClient.create_from_connection_string(arpi_node_connection_string) # <-- Final GUI change
+client = IoTHubDeviceClient.create_from_connection_string(arpi_node_connection_string)
 # Declare schedule task
-### ScheduleTask.ScheduleTask().CreateTask(schedule_action,schedule_arguments,"11:31:00") # <-- Final GUI change
+### ScheduleTask.ScheduleTask().CreateTask(schedule_action,schedule_arguments,"11:31:00")
 
 
 # Define the type of dash to be used ("\" or "/") depending on OS. # <-- Final GUI change
@@ -93,13 +98,14 @@ global DictReturn # This dictionary contains the name, plu and image path of top
 suggestions = ["potato","mango","banana"]
 names = []
 DictReturn= {
-    0:{"name":"avocado", "PLU":"2661", "path":path + "imgs/avocado.png"},
-    1:{"name":"pineapple", "PLU":"2671", "path":path + "imgs/pineapple.png"},
-    2:{"name":"onion", "PLU":"2677", "path":path + "imgs/onion.png"}
+    0:{"name":"aguacate", "PLU":"2661", "path":path + "imgs/aguacate.png"},
+    1:{"name":"platano", "PLU":"2671", "path":path + "imgs/platano.png"},
+    2:{"name":"cebolla_blanca", "PLU":"2677", "path":path + "imgs/cebolla_blanca.png"}
 }
 
 # warnings.filterwarnings('ignore')
 model = load_model(path + "local_SGD_test_300.model")
+model2 = load_model(path + "local_SGD_PRODUCT_200e.model")
 warnings.resetwarnings()
 
 def process_image(image,width,height):
@@ -109,24 +115,37 @@ def process_image(image,width,height):
 
     return processedImg
 
+
+
+
+
 class App(tk.Tk):
 
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
         global suggestions
+        global pathN
+        global percentages
+        global names
+        global feedback
+        names = ["None", "None", "None"]
+        percentages = [0,0,0]
+        pathN = "00023_0"
+        feedback = "None"
         self.attributes("-toolwindow",1)
         self.resizable(0,0)
-        self.HEIGHT = self.winfo_screenheight() # <-- Final GUI change
-        self.WIDTH = self.winfo_screenwidth() # <-- Final GUI change
+        self.HEIGHT = self.winfo_screenheight()
+        self.WIDTH = self.winfo_screenwidth()
+        print(self.HEIGHT,self.WIDTH)
         # Establish window size (it will be equal to the screen size)
         self.geometry("{0}x{1}+0+0".format(self.winfo_screenwidth(), self.winfo_screenheight()))
         self.overrideredirect(1)
         self.focus_set() # <-- move focus to this widget
 
+
         # Keyboard Page-Control using binds
-        #self.bind("<Escape>", lambda e: self.close_window()) # <-- close everything
-        self.bind("<Escape>", lambda e: self.close_window()) # <-- close everything
-        self.bind("p", lambda f: self.changeSuggestions()) # <-- change
+        self.bind("<Escape>", lambda e: self.close_window()) 
+        self.bind("p", lambda f: self.changeSuggestions())
         self.bind("1", lambda a: self.show_frame("PageOne"))
         self.bind("2", lambda a: self.show_frame("PageTwo"))
         self.bind("3", lambda a: self.show_frame("PageThree"))
@@ -162,6 +181,7 @@ class App(tk.Tk):
         self.destroy()
 
 
+
     def changeSuggestions(self):
         global suggestions
         suggestions = ["avocado","purpleonion","redapple"]
@@ -173,6 +193,7 @@ class PageOne(tk.Frame):
         global DictReturn
         global names 
         global percentages
+        global namesStr
 
         self.HEIGHT = controller.HEIGHT # <--
         self.WIDTH = controller.WIDTH
@@ -188,10 +209,11 @@ class PageOne(tk.Frame):
         self.i = 1
         template = cv2.imread(path + "imgs/template.png", 0)
         self.template = template
-        self.detThreshold = .88
+        self.detThreshold = .84
         HEIGHT = self.master.winfo_screenwidth()
         WIDTH = self.master.winfo_screenheight()
-        self.vid = MyVideoCapture(0) # <-- Changed in final version
+        self.vid = MyVideoCapture(1) # <-- Zchange
+        self.newTemplate = None
 
         # Add canvas to frame
         self.can = tk.Canvas(self, width=self.winfo_screenwidth(), height=self.winfo_screenheight(), bg='#ffffff')
@@ -279,6 +301,10 @@ class PageOne(tk.Frame):
     def update(self, *args, **kwargs):
         global names
         global DictReturn
+        global pathN
+        global percentages
+        global client
+        global feedback
         ret, frame = self.vid.get_frame()
         #newImg = cv2.resize(frame, (640,420))
         newImg = PIL.ImageTk.PhotoImage(image = PIL.Image.fromarray(frame))
@@ -295,9 +321,10 @@ class PageOne(tk.Frame):
                 self.can2.itemconfig(self.firstImg, image = self.img)
                 self.can2.itemconfig(self.detMsg, image = self.inst3)
                 self.counter = 0
-            if self.counter > self.ctrLimit:
+            if (self.counter > self.ctrLimit):
+
                 if self.newProdFlg == False:
-                    playsound(path + "press.wav", block=False)
+                    # playsound(path + "press.wav", block=False) # Zchange
                     self.newProdFlg = True
                     Uid = uuid.uuid1()
                     pathN3 = str(Uid) + "_"+str(self.i)
@@ -309,15 +336,28 @@ class PageOne(tk.Frame):
                     pathN = os.path.join(pathN2,pathN3+".png")
                     print("pathn: ", pathN)
                     cv2.imwrite(pathN, frame)
-                    names, percentages, namesStr = predict_new_single.singleInference(pathN, model, i) #<-- Temporarily disabled
+                    prod= predict_new_product.singleInference(pathN,model2,i)
+                    # if prod[0] == "product":
+                    names, percentages, namesStr = predict_new_single.singleInference(pathN, model, i)
+                    print(f"[INFO] {names}") # Zchange
+                    print(f"[INFO] {percentages}") # Zchange
+                    print(f"[INFO] {namesStr}") # Zchange
                     self.i += 1
-                    # D2C.SendDeviceToCloudMessage().iothub_client_send_telemetry(client, pathN3, names[0], round(percentages[0],6),names[1], round(percentages[1],6),names[2], round(percentages[2],6),1)
-                    DictReturn = GetDict(names) #<-- Temporarily disabled
-                    #print(DictReturn)
-                    self.controller.frames["PageTwo"].DictReturn = DictReturn #<-- Temporarily disabled
-                    self.controller.frames["PageTwo"].updateImgs() #<-- Temporarily disabled
-                    self.controller.show_frame("PageTwo") #<-- Temporarily disabled
-                    #self.counter = 0
+                    # D2C.SendDeviceToCloudMessage().iothub_client_send_telemetry(client, pathN3, names[0], round(percentages[0],6),names[1], round(percentages[1],6),names[2], round(percentages[2],6),1,feedback)
+                    DictReturn = GetDict(names)
+                    feedback = DictReturn[0]["PLU"]
+                    print("--------")
+                    print("[INFO] Dictionary to send:")
+                    print(DictReturn)
+                    # print("[INFO] Name of file:")
+                    # print(pathN + "\n")
+                    print("--------")
+                    self.controller.frames["PageTwo"].DictReturn = DictReturn 
+                    self.controller.frames["PageTwo"].updateImgs() 
+                    # self.controller.show_frame("PageTwo") # Zchange 
+                    # else:
+                    #     pass
+
                 else:
                     pass
             else:
@@ -341,6 +381,8 @@ class PageTwo(tk.Frame):
         global names
         global DictReturn
         global percentages
+        global feedback
+        global client
 
      
         tk.Frame.__init__(self, parent)
@@ -454,36 +496,33 @@ class PageTwo(tk.Frame):
         self.dosre=PIL.ImageTk.PhotoImage(self.dos)
         self.lastMsg = self.can2.create_image(500,800, image=self.dosre)
 
-        # # Finish button
-        # self.finish= PIL.Image.open(path + "imgs/terminar.png")
-        # self.finish= self.finish.resize((780,90), PIL.Image.ANTIALIAS)
-        # self.finishre=PIL.ImageTk.PhotoImage(self.finish)
-        # self.button5= tk.Button(self, background="#ffffff", image= self.finishre, command=lambda: self.controller.show_frame("PageOne"))
-        # self.button5.place(relx=0.6, rely=0.55 ,relwidth=0.33, relheight=.08)
-        # self.button5.image= self.finishre
 
         # Finish image
-        self.finish= PIL.Image.open(path + "imgs/finish.png")
-        self.finish= self.finish.resize((500,140), PIL.Image.ANTIALIAS)
+        self.finish= PIL.Image.open(path + "imgs/finish_button.png")
+        self.finish= self.finish.resize((600,100), PIL.Image.ANTIALIAS)
         self.finishre=PIL.ImageTk.PhotoImage(self.finish)
         self.finishMsg = self.can2.create_image(500,640, image=self.finishre)
-        self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.controller.show_frame("PageOne"))
-
-
-        # # Search button
-        # self.search= PIL.Image.open(path + "imgs/buscar_producto.png")
-        # self.search= self.search.resize((380,70), PIL.Image.ANTIALIAS)
-        # self.searchre=PIL.ImageTk.PhotoImage(self.search)
-        # self.button6= tk.Button(self, background="#ffffff", image= self.searchre, command=lambda: self.controller.show_frame("PageThree"))
-        # self.button6.place(relx=0.66, rely=0.85 ,relwidth=0.20, relheight=.06)
-        # self.button6.image= self.finishre
+        # self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.controller.show_frame("PageOne"))
+        self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.uploadData())
 
         # Search image
-        self.search= PIL.Image.open(path + "imgs/search.png")
-        self.search= self.search.resize((500,140), PIL.Image.ANTIALIAS)
+        self.search= PIL.Image.open(path + "imgs/search_button.png")
+        self.search= self.search.resize((600,100), PIL.Image.ANTIALIAS)
         self.searchre=PIL.ImageTk.PhotoImage(self.search)
         self.searchMsg = self.can2.create_image(500,1000, image=self.searchre)
         self.can2.tag_bind(self.searchMsg, '<Button-1>', lambda b: self.controller.show_frame("PageThree"))        
+
+    def uploadData(self):
+        global DictReturn
+        global names 
+        global percentages
+        global namesStr
+        global feedback
+        global pathN3
+        global client
+        # feedback = "onion"
+        D2C.SendDeviceToCloudMessage().iothub_client_send_telemetry(client, pathN3, names[0], round(percentages[0],6),names[1], round(percentages[1],6),names[2], round(percentages[2],6),1,feedback)
+        self.controller.show_frame("PageOne")
 
     def updateImgs(self):
         """
@@ -524,7 +563,8 @@ class PageTwo(tk.Frame):
         self.label8.image= self.option4re
 
     def changeImg(self,imgNo):
-
+        global feedback
+        feedback = self.DictReturn[imgNo]["PLU"]
         self.option1= PIL.Image.open(self.DictReturn[imgNo]["path"])
         self.option1= self.option1.resize((270,270), PIL.Image.ANTIALIAS)
         self.option1re=PIL.ImageTk.PhotoImage(self.option1)
@@ -541,14 +581,18 @@ class PageTwo(tk.Frame):
 class PageThree(tk.Frame):
 
     def __init__(self, parent, controller):
+        global DictReturn
         global suggestions
+        global pathN3
+        global client
+        global feedback
         tk.Frame.__init__(self, parent)
         self.controller = controller
         self.data = pd.read_csv("AbrilHEB.csv")
         self.data = pd.DataFrame(self.data)
         self.HEIGHT = controller.HEIGHT # <-- Final GUI change
         self.WIDTH = controller.WIDTH # <-- Final GUI change
-        self.equation = tk.StringVar()
+        self.equation = tk.StringVar(value="Inserte nombre del producto aquí...")
         self.returnCounter = 0
         self.returnLimit = 15000
         HEIGHT = self.master.winfo_screenwidth()
@@ -559,6 +603,9 @@ class PageThree(tk.Frame):
         self.searchResults3 = tk.StringVar()
         self.exp = ""
         self.labelFlag = False
+        self.DictReturn = DictReturn
+
+        self.list_of_items = getList.getListOfItems()
 
         # Add canvas to frame
         self.can = tk.Canvas(self, width=self.winfo_screenwidth(), height=self.winfo_screenheight(), bg='#ffffff')
@@ -579,14 +626,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas = tk.Canvas(self, width=self.winfo_screenwidth(), height=self.winfo_screenheight(), bg='#D2D7DF')
         self.keyboardCanvas.place(relx=0.5, rely=(2/3) ,relwidth=.5, relheight=.4)
 
-        Dis_entry = tk.Entry(self.can2,state= 'readonly',textvariable = self.equation, font = ("Helvetica","22"))
-        Dis_entry.place(relx=0.07, rely=.15 ,relwidth=.35, relheight=.07)
-
-        # self.searchBox = tk.Label(self.can2, bg ="#D2D7DF", textvariable  = self.searchResults, font = ("Helvetica","20"), anchor = "w")
-        # self.searchBox.place(relx=0.07, rely=.22 ,relwidth=.35, relheight=.07)
-
-        # self.searchBox2 = tk.Label(self.can2, bg ="#D2D7DF", textvariable  = self.searchResults2, font = ("Helvetica","20"), anchor = "w")
-        # self.searchBox2.place(relx=0.07, rely=.29 ,relwidth=.35, relheight=.07)
 
         # self.searchBox3 = tk.Label(self.can2, bg ="#D2D7DF", textvariable  = self.searchResults3, font = ("Helvetica","20"), anchor = "w")
         # self.searchBox3.place(relx=0.07, rely=.36 ,relwidth=.35, relheight=.07)
@@ -614,11 +653,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgW, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgW, image = self.buttonW))
         self.keyboardCanvas.tag_bind(self.lastMsgW, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgW, image = self.buttonW_pressed, char = "W" ))
 
-        # self.buttonW= PIL.Image.open(path + "imgs/normal_buttons/w.png")
-        # self.buttonW= self.buttonW.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instW= PIL.ImageTk.PhotoImage(self.buttonW)
-        # self.lastMsgW = self.keyboardCanvas.create_image(130,60, image=self.instW)
-
         ## E
         # -- Images
         self.buttonE = process_image(imgPath + "normal_buttons/e.png",self.keyWidth,self.keyHeight)
@@ -627,11 +661,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgE, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgE, image = self.buttonE))
         self.keyboardCanvas.tag_bind(self.lastMsgE, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgE, image = self.buttonE_pressed, char = "E" ))
-
-        # self.buttonE= PIL.Image.open(path + "imgs/normal_buttons/e.png")
-        # self.buttonE= self.buttonE.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instE= PIL.ImageTk.PhotoImage(self.buttonE)
-        # self.lastMsgE = self.keyboardCanvas.create_image(200 ,60, image=self.instE)
 
         ## R
         # -- Images
@@ -642,11 +671,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgR, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgR, image = self.buttonR))
         self.keyboardCanvas.tag_bind(self.lastMsgR, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgR, image = self.buttonR_pressed, char = "R" ))
 
-        # self.buttonR= PIL.Image.open(path + "imgs/normal_buttons/r.png")
-        # self.buttonR= self.buttonR.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instR= PIL.ImageTk.PhotoImage(self.buttonR)
-        # self.lastMsgR = self.keyboardCanvas.create_image(270,60, image=self.instR)
-
         ## T
         # -- Images
         self.buttonT = process_image(imgPath + "normal_buttons/t.png",self.keyWidth,self.keyHeight)
@@ -655,11 +679,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgT, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgT, image = self.buttonT))
         self.keyboardCanvas.tag_bind(self.lastMsgT, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgT, image = self.buttonT_pressed, char = "T" ))
-
-        # self.buttonT= PIL.Image.open(path + "imgs/normal_buttons/t.png")
-        # self.buttonT= self.buttonT.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instT= PIL.ImageTk.PhotoImage(self.buttonT)
-        # self.lastMsgT = self.keyboardCanvas.create_image(340,60, image=self.instT)
 
         ## Y
         # -- Images
@@ -670,12 +689,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgY, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgY, image = self.buttonY))
         self.keyboardCanvas.tag_bind(self.lastMsgY, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgY, image = self.buttonY_pressed, char = "Y" ))
 
-
-        # self.buttonY= PIL.Image.open(path + "imgs/normal_buttons/y.png")
-        # self.buttonY= self.buttonY.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instY= PIL.ImageTk.PhotoImage(self.buttonY)
-        # self.lastMsgY = self.keyboardCanvas.create_image(410,60, image=self.instY)
-
         ## U
         # -- Images
         self.buttonU = process_image(imgPath + "normal_buttons/u.png",self.keyWidth,self.keyHeight)
@@ -684,12 +697,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgU, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgU, image = self.buttonU))
         self.keyboardCanvas.tag_bind(self.lastMsgU, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgU, image = self.buttonU_pressed, char = "U" ))
-
-
-        # self.buttonU= PIL.Image.open(path + "imgs/normal_buttons/u.png")
-        # self.buttonU= self.buttonU.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instU= PIL.ImageTk.PhotoImage(self.buttonU)
-        # self.lastMsgU = self.keyboardCanvas.create_image(480,60, image=self.instU)
 
         ## I
         # -- Images
@@ -700,11 +707,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgI, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgI, image = self.buttonI))
         self.keyboardCanvas.tag_bind(self.lastMsgI, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgI, image = self.buttonI_pressed, char = "I" ))
 
-        # self.buttonI= PIL.Image.open(path + "imgs/normal_buttons/i.png")
-        # self.buttonI= self.buttonI.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instI= PIL.ImageTk.PhotoImage(self.buttonI)
-        # self.lastMsgI = self.keyboardCanvas.create_image(550,60, image=self.instI)
-
         ## O
         # -- Images
         self.buttonO = process_image(imgPath + "normal_buttons/o.png",self.keyWidth,self.keyHeight)
@@ -713,11 +715,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgO, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgO, image = self.buttonO))
         self.keyboardCanvas.tag_bind(self.lastMsgO, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgO, image = self.buttonO_pressed, char = "O" ))
-
-        # self.buttonO= PIL.Image.open(path + "imgs/normal_buttons/o.png")
-        # self.buttonO= self.buttonO.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instO= PIL.ImageTk.PhotoImage(self.buttonO)
-        # self.lastMsgO = self.keyboardCanvas.create_image(620,60, image=self.instO)
 
         ## P
         # -- Images
@@ -728,11 +725,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgP, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgP, image = self.buttonP))
         self.keyboardCanvas.tag_bind(self.lastMsgP, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgP, image = self.buttonP_pressed, char = "P" ))
 
-        # self.buttonP= PIL.Image.open(path + "imgs/normal_buttons/p.png")
-        # self.buttonP= self.buttonP.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instP= PIL.ImageTk.PhotoImage(self.buttonP)
-        # self.lastMsgP = self.keyboardCanvas.create_image(690,60, image=self.instP)
-
         ## DEL (BACKSPACE)
         # -- Images
         self.buttonDEL = process_image(imgPath + "normal_buttons/delete.png",158,69)
@@ -741,11 +733,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgDEL, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgDEL, image = self.buttonDEL))
         self.keyboardCanvas.tag_bind(self.lastMsgDEL, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgDEL, image = self.buttonDEL_pressed, char = "DEL" ))       
-
-        # self.buttonDEL= PIL.Image.open(path + "imgs/normal_buttons/delete.png")
-        # self.buttonDEL= self.buttonDEL.resize((158,69), PIL.Image.ANTIALIAS)
-        # self.instDEL= PIL.ImageTk.PhotoImage(self.buttonDEL)
-        # self.lastMsgDEL = self.keyboardCanvas.create_image(823,60, image=self.instDEL)
 
         ### ROW 2
         ## A
@@ -757,11 +744,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgA, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgA, image = self.buttonA))
         self.keyboardCanvas.tag_bind(self.lastMsgA, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgA, image = self.buttonA_pressed, char = "A" ))
         
-        # self.buttonA= PIL.Image.open(path + "imgs/normal_buttons/a.png")
-        # self.buttonA= self.buttonA.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instA= PIL.ImageTk.PhotoImage(self.buttonA)
-        # self.lastMsgA = self.keyboardCanvas.create_image(75,135, image=self.instA)
-
         ## S
         # -- Images
         self.buttonS = process_image(imgPath + "normal_buttons/s.png",self.keyWidth,self.keyHeight)
@@ -770,11 +752,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgS, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgS, image = self.buttonS))
         self.keyboardCanvas.tag_bind(self.lastMsgS, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgS, image = self.buttonS_pressed, char = "S" ))
-
-        # self.buttonS= PIL.Image.open(path + "imgs/normal_buttons/s.png")
-        # self.buttonS= self.buttonS.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instS= PIL.ImageTk.PhotoImage(self.buttonS)
-        # self.lastMsgS = self.keyboardCanvas.create_image(145,135, image=self.instS)
 
         ## D
         # -- Images
@@ -785,11 +762,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgD, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgD, image = self.buttonD))
         self.keyboardCanvas.tag_bind(self.lastMsgD, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgD, image = self.buttonD_pressed, char = "D" ))
         
-        # self.buttonD= PIL.Image.open(path + "imgs/normal_buttons/d.png")
-        # self.buttonD= self.buttonD.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instD= PIL.ImageTk.PhotoImage(self.buttonD)
-        # self.lastMsgD = self.keyboardCanvas.create_image(215,135, image=self.instD)
-
         ## F
         # -- Images
         self.buttonF = process_image(imgPath + "normal_buttons/f.png",self.keyWidth,self.keyHeight)
@@ -798,12 +770,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgF, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgF, image = self.buttonF))
         self.keyboardCanvas.tag_bind(self.lastMsgF, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgF, image = self.buttonF_pressed, char = "F" ))
-
-
-        # self.buttonF= PIL.Image.open(path + "imgs/normal_buttons/f.png")
-        # self.buttonF= self.buttonF.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instF= PIL.ImageTk.PhotoImage(self.buttonF)
-        # self.lastMsgF = self.keyboardCanvas.create_image(285,135, image=self.instF)
 
         ## G
         # -- Images
@@ -814,12 +780,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgG, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgG, image = self.buttonG))
         self.keyboardCanvas.tag_bind(self.lastMsgG, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgG, image = self.buttonG_pressed, char = "G" ))
 
-        
-        # self.buttonG= PIL.Image.open(path + "imgs/normal_buttons/g.png")
-        # self.buttonG= self.buttonG.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instG= PIL.ImageTk.PhotoImage(self.buttonG)
-        # self.lastMsgG = self.keyboardCanvas.create_image(355,135, image=self.instG)
-
         ## H
         # -- Images
         self.buttonH = process_image(imgPath + "normal_buttons/h.png",self.keyWidth,self.keyHeight)
@@ -828,11 +788,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgH, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgH, image = self.buttonH))
         self.keyboardCanvas.tag_bind(self.lastMsgH, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgH, image = self.buttonH_pressed, char = "H" ))
-
-        # self.buttonH= PIL.Image.open(path + "imgs/normal_buttons/h.png")
-        # self.buttonH= self.buttonH.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instH= PIL.ImageTk.PhotoImage(self.buttonH)
-        # self.lastMsgH = self.keyboardCanvas.create_image(425,135, image=self.instH)
 
         ## J
         # -- Images
@@ -843,11 +798,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgJ, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgJ, image = self.buttonJ))
         self.keyboardCanvas.tag_bind(self.lastMsgJ, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgJ, image = self.buttonJ_pressed, char = "J" ))
 
-        # self.buttonJ= PIL.Image.open(path + "imgs/normal_buttons/j.png")
-        # self.buttonJ= self.buttonJ.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instJ= PIL.ImageTk.PhotoImage(self.buttonJ)
-        # self.lastMsgJ = self.keyboardCanvas.create_image(495,135, image=self.instJ)
-
         ## K
         # -- Images
         self.buttonK = process_image(imgPath + "normal_buttons/k.png",self.keyWidth,self.keyHeight)
@@ -856,12 +806,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgK, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgK, image = self.buttonK))
         self.keyboardCanvas.tag_bind(self.lastMsgK, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgK, image = self.buttonK_pressed, char = "K" ))
-
-        # self.buttonK= PIL.Image.open(path + "imgs/normal_buttons/k.png")
-        # self.buttonK= self.buttonK.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instK= PIL.ImageTk.PhotoImage(self.buttonK)
-        # self.lastMsgK = self.keyboardCanvas.create_image(565,135, image=self.instK)
-
         ## L
         # -- Images
         self.buttonL = process_image(imgPath + "normal_buttons/l.png",self.keyWidth,self.keyHeight)
@@ -871,28 +815,12 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgL, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgL, image = self.buttonL))
         self.keyboardCanvas.tag_bind(self.lastMsgL, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgL, image = self.buttonL_pressed, char = "L" ))
 
-        # self.buttonL= PIL.Image.open(path + "imgs/normal_buttons/l.png")
-        # self.buttonL= self.buttonL.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instL= PIL.ImageTk.PhotoImage(self.buttonL)
-        # self.lastMsgL= self.keyboardCanvas.create_image(635,135, image=self.instL)
-
-
 
         ## RET
         # -- Images
         self.buttonRET = process_image(imgPath + "normal_buttons/return.png",205,142)
         self.buttonRET_pressed = process_image(imgPath + "normal_buttons/returnp.png",205,142)
         self.lastMsgRET= self.keyboardCanvas.create_image(798,173, image=self.buttonRET)
-        # -- Binds
-        # self.keyboardCanvas.tag_bind(self.lastMsgRET, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgRET, image = self.buttonRET))
-        # self.keyboardCanvas.tag_bind(self.lastMsgRET, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgRET, image = self.buttonRET_pressed, char = "\n" ))
-        #self.keyboardCanvas.tag_bind(self.lastMsgRET, '<ButtonRelease-1>', self.showPLU)
-        #self.keyboardCanvas.tag_bind(self.lastMsgRET, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgRET, image = self.buttonRET_pressed, char = "\n" ))
-
-        # self.buttonRET= PIL.Image.open(path + "imgs/normal_buttons/return.png")
-        # self.buttonRET= self.buttonRET.resize((205,142), PIL.Image.ANTIALIAS)
-        # self.instRET= PIL.ImageTk.PhotoImage(self.buttonRET)
-        # self.lastMsgRET= self.keyboardCanvas.create_image(798,173, image=self.instRET)
 
         ## Ñ
         # -- Images
@@ -902,11 +830,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgÑ, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgÑ, image = self.buttonÑ))
         self.keyboardCanvas.tag_bind(self.lastMsgÑ, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgÑ, image = self.buttonÑ_pressed, char = "Ñ" ))
-
-        # self.buttonÑ= PIL.Image.open(path + "imgs/normal_buttons/ñ.png ")
-        # self.buttonÑ= self.buttonÑ.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instÑ= PIL.ImageTk.PhotoImage(self.buttonÑ)
-        # self.lastMsgÑ= self.keyboardCanvas.create_image(705,135, image=self.instÑ)
 
         # Row 3
 
@@ -919,11 +842,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgZ, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgZ, image = self.buttonZ))
         self.keyboardCanvas.tag_bind(self.lastMsgZ, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgZ, image = self.buttonZ_pressed, char = "Z" ))
 
-        # self.buttonZ= PIL.Image.open(path + "imgs/normal_buttons/z.png")
-        # self.buttonZ= self.buttonZ.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instZ= PIL.ImageTk.PhotoImage(self.buttonZ)
-        # self.lastMsgZ = self.keyboardCanvas.create_image(95,210, image=self.instZ)
-
         ## X
         # -- Images
         self.buttonX = process_image(imgPath + "normal_buttons/x.png",self.keyWidth,self.keyHeight)
@@ -932,13 +850,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgX, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgX, image = self.buttonX))
         self.keyboardCanvas.tag_bind(self.lastMsgX, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgX, image = self.buttonX_pressed, char = "X" ))
-
-
-        # self.buttonX= PIL.Image.open(path + "imgs/normal_buttons/x.png")
-        # self.buttonX= self.buttonX.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instX= PIL.ImageTk.PhotoImage(self.buttonX)
-        # self.lastMsgX = self.keyboardCanvas.create_image(165,210, image=self.instX)
-
         ## C
         # -- Images
         self.buttonC = process_image(imgPath + "normal_buttons/c.png",self.keyWidth,self.keyHeight)
@@ -947,11 +858,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgC, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgC, image = self.buttonC))
         self.keyboardCanvas.tag_bind(self.lastMsgC, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgC, image = self.buttonC_pressed, char = "C" ))
-
-        # self.buttonC= PIL.Image.open(path + "imgs/normal_buttons/c.png")
-        # self.buttonC= self.buttonC.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instC= PIL.ImageTk.PhotoImage(self.buttonC)
-        # self.lastMsgC = self.keyboardCanvas.create_image(235,210, image=self.instC)
 
         ## V
         # -- Images
@@ -962,11 +868,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgV, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgV, image = self.buttonV))
         self.keyboardCanvas.tag_bind(self.lastMsgV, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgV, image = self.buttonV_pressed, char = "V" ))
 
-        # self.buttonV= PIL.Image.open(path + "imgs/normal_buttons/v.png")
-        # self.buttonV= self.buttonV.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instV= PIL.ImageTk.PhotoImage(self.buttonV)
-        # self.lastMsgV= self.keyboardCanvas.create_image(305,210, image=self.instV)
-
         ## B
         # -- Images
         self.buttonB = process_image(imgPath + "normal_buttons/b.png",self.keyWidth,self.keyHeight)
@@ -975,11 +876,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgB, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgB, image = self.buttonB))
         self.keyboardCanvas.tag_bind(self.lastMsgB, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgB, image = self.buttonB_pressed, char = "B" ))
-
-        # self.buttonB= PIL.Image.open(path + "imgs/normal_buttons/b.png")
-        # self.buttonB= self.buttonB.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instB= PIL.ImageTk.PhotoImage(self.buttonB)
-        # self.lastMsgB= self.keyboardCanvas.create_image(375,210, image=self.instB)
 
         ## N
         # -- Images
@@ -990,11 +886,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgN, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgN, image = self.buttonN))
         self.keyboardCanvas.tag_bind(self.lastMsgN, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgN, image = self.buttonN_pressed, char = "N" ))
 
-        # self.buttonN= PIL.Image.open(path + "imgs/normal_buttons/n.png")
-        # self.buttonN= self.buttonN.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instN= PIL.ImageTk.PhotoImage(self.buttonN)
-        # self.lastMsgN= self.keyboardCanvas.create_image(445,210, image=self.instN)
-
         ## M
         # -- Images
         self.buttonM = process_image(imgPath + "normal_buttons/m.png",self.keyWidth,self.keyHeight)
@@ -1004,10 +895,6 @@ class PageThree(tk.Frame):
         self.keyboardCanvas.tag_bind(self.lastMsgM, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgM, image = self.buttonM))
         self.keyboardCanvas.tag_bind(self.lastMsgM, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgM, image = self.buttonM_pressed, char = "M" ))
 
-        # self.buttonM= PIL.Image.open(path + "imgs/normal_buttons/m.png")
-        # self.buttonM= self.buttonM.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instM= PIL.ImageTk.PhotoImage(self.buttonM)
-        # self.lastMsgM= self.keyboardCanvas.create_image(515,210, image=self.instM)
 
         ## M
         # -- Images
@@ -1017,16 +904,6 @@ class PageThree(tk.Frame):
         # -- Binds
         self.keyboardCanvas.tag_bind(self.lastMsgCOMM, '<ButtonRelease-1>', lambda b: self.onObjectRelease(event ='<ButtonRelease-1>', object =self.lastMsgCOMM, image = self.buttonCOMM))
         self.keyboardCanvas.tag_bind(self.lastMsgCOMM, '<Button-1>', lambda a: self.onObjectClick(event ='<Button-1>', object =self.lastMsgCOMM, image = self.buttonCOMM_pressed, char = "," ))
-
-        # self.buttonCOMM= PIL.Image.open(path + "imgs/normal_buttons/coma.png")
-        # self.buttonCOMM= self.buttonCOMM.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instCOMM= PIL.ImageTk.PhotoImage(self.buttonCOMM)
-        # self.lastMsgCOMM= self.keyboardCanvas.create_image(585,210, image=self.instCOMM)
-
-        # self.buttonDOT= PIL.Image.open(path + "imgs/normal_buttons/punto.png")
-        # self.buttonDOT= self.buttonDOT.resize((self.keyWidth,self.keyHeight), PIL.Image.ANTIALIAS)
-        # self.instDOT= PIL.ImageTk.PhotoImage(self.buttonDOT)
-        # self.lastMsgDOT= self.keyboardCanvas.create_image(655,210, image=self.instDOT)
 
         ## DOT
         # -- Images
@@ -1051,7 +928,6 @@ class PageThree(tk.Frame):
         self.can2.create_image(500,500, image=self.img2)
 
 
-
         # HEB logo
         self.logoRaw= PIL.Image.open(path + "imgs/logo.png")
         self.logoRaw= self.logoRaw.resize((210,70), PIL.Image.ANTIALIAS)
@@ -1060,45 +936,57 @@ class PageThree(tk.Frame):
         self.label1.place (relx=-0.03, rely=.02, relwidth= .2, relheight=.07)
         self.label1.image=self.logo
 
-        # Instructions 1 P2
-        self.uno= PIL.Image.open(path + "imgs/select.PNG")
-        self.uno= self.uno.resize((750,220), PIL.Image.ANTIALIAS)
+        # Instructions 1 Page3
+        # self.uno= PIL.Image.open(path + "imgs/select.PNG")
+        self.uno= PIL.Image.open(path + "imgs/P3_buscar.png")
+        self.uno= self.uno.resize((600,150), PIL.Image.ANTIALIAS)
         self.unore=PIL.ImageTk.PhotoImage(self.uno)
         self.label4= tk.Label(self.can, background="#FFFFFF", image= self.unore)
         self.label4.place(relx=0.02, rely=0.12 ,relwidth=0.4, relheight=.16)
         self.label4.image= self.unore      
 
-        # Animated Instructions P2
-        self.anim1Raw= PIL.Image.open(path + "imgs/animation2.png")
+        # Animated Instructions Page3
+        self.anim1Raw= PIL.Image.open(path + "imgs/animation3.png")
         self.anim1Raw= self.anim1Raw.resize((580,380), PIL.Image.ANTIALIAS)
         self.anim1= PIL.ImageTk.PhotoImage(self.anim1Raw)
         self.label3= tk.Label(self, background= "#FFFFFF", image= self.anim1) 
         self.label3.place (relx=0.12, rely=.35, relwidth= .3, relheight=.33)
         self.label3.image=self.anim1
 
+        # Search Instructions
+        self.search= PIL.Image.open(path + "imgs/buscar.png")
+        self.search= self.search.resize((360,100), PIL.Image.ANTIALIAS)
+        self.searchre=PIL.ImageTk.PhotoImage(self.search)
+        self.searchMsg = self.can2.create_image(200,80, image=self.searchre)
 
-
-        # # Finish button
-        # self.finish= PIL.Image.open(path + "imgs/terminar.png")
-        # self.finish= self.finish.resize((780,90), PIL.Image.ANTIALIAS)
-        # self.finishre=PIL.ImageTk.PhotoImage(self.finish)
-        # self.button5= tk.Button(self, background="#ffffff", image= self.finishre, command=lambda: self.controller.show_frame("PageOne"))
-        # self.button5.place(relx=0.6, rely=0.55 ,relwidth=0.33, relheight=.08)
-        # self.button5.image= self.finishre
 
         # Finish image
-        self.finish= PIL.Image.open(path + "imgs/finish.png")
-        self.finish= self.finish.resize((500,140), PIL.Image.ANTIALIAS)
+        self.finish= PIL.Image.open(path + "imgs/finish_button.png")
+        self.finish= self.finish.resize((600,100), PIL.Image.ANTIALIAS)
         self.finishre=PIL.ImageTk.PhotoImage(self.finish)
         self.finishMsg = self.can2.create_image(500,640, image=self.finishre)
-        self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.controller.show_frame("PageOne"))
-        # Update
-        #self.update()
+        # self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.controller.show_frame("PageOne"))
+        self.can2.tag_bind(self.finishMsg, '<Button-1>', lambda b: self.uploadData())
+
+        # Search bar
+
+        combobox_autocomplete = tkstuff_4.Combobox_Autocomplete(self.can2, self.list_of_items, self.equation,highlightthickness=1, font = ("Helvetica","20"))
+        combobox_autocomplete.place(relx=0.07, rely=.15 ,relwidth=.35, relheight=.07)
+
+    def uploadData(self):
+        global DictReturn
+        global names 
+        global percentages
+        global namesStr
+        global feedback
+        global pathN3
+        global client
+        D2C.SendDeviceToCloudMessage().iothub_client_send_telemetry(client, pathN3, names[0], round(percentages[0],6),names[1], round(percentages[1],6),names[2], round(percentages[2],6),1,feedback)
+        self.controller.show_frame("PageOne")
 
 
     def onObjectClick(self,event,object,image,char):
         self.keyboardCanvas.itemconfig(object, image = image)
-
         if char == "DEL":
             self.exp = self.exp[:-1]
         else:
@@ -1110,148 +998,55 @@ class PageThree(tk.Frame):
     def onObjectRelease(self,event,object,image):
         self.keyboardCanvas.itemconfig(object, image = image)  
 
-              
-
-
     def action(self):
-
+        global feedback
         self.equation.set(self.exp)
         print(self.equation.get()) 
         x = self.equation.get()
-        
-
+    
         if (self.exp == ""):
             print("variable vacia")
-            self.searchBox.destroy()
-            self.searchBox2.destroy()
-            self.searchBox3.destroy()
             self.labelFlag=False
         elif (self.exp != "") and (self.labelFlag==False):
-            df1 = self.data[self.data['Producto'].str.contains(x,case=False)] 
-            print("Creando labels")
-            self.searchBox = tk.Button(self.can2, bg ="#FFFFFF", textvariable  = self.searchResults, font = ("Helvetica","20"), anchor = "w", command = self.showPLU,borderwidth=0)
-            self.searchBox.place(relx=0.07, rely=.22 ,relwidth=.35, relheight=.07)
-
-            self.searchBox2 = tk.Button(self.can2, bg ="#FFFFFF", textvariable  = self.searchResults2, font = ("Helvetica","20"), anchor = "w", command = self.showPLU2,borderwidth=0)
-            self.searchBox2.place(relx=0.07, rely=.29 ,relwidth=.35, relheight=.07)
-
-            self.searchBox3 = tk.Button(self.can2, bg ="#FFFFFF", textvariable  = self.searchResults3, font = ("Helvetica","20"), anchor = "w", command = self.showPLU3,borderwidth=0)
-            self.searchBox3.place(relx=0.07, rely=.36 ,relwidth=.35, relheight=.07)
-
-            #self.can2.tag_bind(self.searchBox, '<Button-1>',lambda a: self.showPLU(event = '<Button-1>'))
-            # self.can2.tag_bind(self.searchBox2, '<Button-1>',self.showPLU2)
-            # self.can2.tag_bind(self.searchBox3, '<Button-1>',self.showPLU3)
-
-
-
-            print(df1)
-            list1 = df1.iloc[:,0].values
-            list2 = df1.iloc[:,1].values
-
-
-            self.result1 = list1[0][:23]
-            self.result2 = list1[1][:23]
-            self.result3 = list1[2][:23]
-
-            self.plu1 = list2[0]
-            self.plu2 = list2[1]
-            self.plu3 = list2[2]
-            
-            # for i in range(len(list1)):
-            #     self.searchResults = self.searchResults + str(list1[i]) + " " + str(list2[i]) + "\n"
-            #     print(list1[i], "            ", list2[i])
-            #self.searchBox.configure(text = self.searchResults)
-            #self.searchBox.configure(text = result1)
-            self.searchResults.set(self.result1)
-            self.searchResults2.set(self.result2)
-            self.searchResults3.set(self.result3)
+ 
+            combobox_autocomplete = tkstuff_4.Combobox_Autocomplete(self.can2, self.list_of_items, self.equation,highlightthickness=1, font = ("Helvetica","20"))
+            combobox_autocomplete.place(relx=0.07, rely=.15 ,relwidth=.35, relheight=.07)
+            feedback = combobox_autocomplete.getShownSelection(self)
+            print("feedback is", feedback)
             self.labelFlag = True
 
         elif (self.exp != "") and self.labelFlag==True:
-            df1 = self.data[self.data['Producto'].str.contains(x,case=False)] 
-            print(df1)
-            list1 = df1.iloc[:,0].values
-            list2 = df1.iloc[:,1].values
 
-            self.result1 = list1[0][:23]
-            self.result2 = list1[1][:23]
-            self.result3 = list1[2][:23]
-
-            self.plu1 = list2[0]
-            self.plu2 = list2[1]
-            self.plu3 = list2[2]
-            
-            # for i in range(len(list1)):
-            #     self.searchResults = self.searchResults + str(list1[i]) + " " + str(list2[i]) + "\n"
-            #     print(list1[i], "            ", list2[i])
-            #self.searchBox.configure(text = self.searchResults)
-            #self.searchBox.configure(text = result1)
-            self.searchResults.set(self.result1)
-            self.searchResults2.set(self.result2)
-            self.searchResults3.set(self.result3)
+            combobox_autocomplete = tkstuff_4.Combobox_Autocomplete(self.can2, self.list_of_items, self.equation,highlightthickness=1, font = ("Helvetica","20"))
+            combobox_autocomplete.place(relx=0.07, rely=.15 ,relwidth=.35, relheight=.07)
+            feedback = combobox_autocomplete.getShownSelection(self)
+            print("feedback is", feedback)
             self.labelFlag = True
-
         else:
             pass
         print(self.exp, self.labelFlag)
+   
     def press(self, num):
-        # pass
-        # global exp
+
         self.exp=self.exp + str(num)
         self.equation.set(self.exp)
         self.action()
-    def showPLU(self):
-        self.searchResults.set(self.result1 + "    "+self.plu1)
-        self.searchResults2.set(self.result2)
-        self.searchResults3.set(self.result3)
-
-        self.searchBox.configure(background = "#C8CBD1")
-        self.searchBox2.configure(background = "#ffffff")
-        self.searchBox3.configure(background = "#ffffff")
-
-    def showPLU2(self):
-        self.searchResults2.set(self.result2 + "    "+self.plu2)
-        self.searchResults.set(self.result1)
-        self.searchResults3.set(self.result3)
-
-        self.searchBox.configure(background = "#ffffff")
-        self.searchBox2.configure(background = "#C8CBD1")
-        self.searchBox3.configure(background = "#ffffff")
-
-    def showPLU3(self):
-        self.searchResults3.set(self.result3 + "    "+self.plu3)
-        self.searchResults.set(self.result1)
-        self.searchResults2.set(self.result2)
-
-        self.searchBox.configure(background = "#ffffff")
-        self.searchBox2.configure(background = "#ffffff")
-        self.searchBox3.configure(background = "#C8CBD1")
-
-
-    # def clear(self):
-    #     # self.searchResults = ""
-    #     self.searchBox.configure(text = self.searchResults)
-    #     self.exp = " "
-    #     self.equation.set(self.exp)
 
     def update(self, *args, **kwargs):
-
         #self.returnCounter = self.returnCounter + 10
         if self.returnCounter >= self.returnLimit:
             self.returnCounter = 0
             self.controller.show_frame("PageOne")
         self.delay = 10
         self.after(self.delay, self.update)
+
 class MyVideoCapture:
-    def __init__(self, video_source= 0):
+    def __init__(self, video_source= 1): # Zchange
         # Open the video source
         self.vid = cv2.VideoCapture(video_source)
         if not self.vid.isOpened():
             raise ValueError("Unable to open video source", video_source)
 
-        # Get video source width and height
-       # self.width = self.vid.get(cv2.CAP_PROP_FRAME_WIDTH)
-       # self.height = self.vid.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
     def get_frame(self):
         if self.vid.isOpened():
@@ -1276,8 +1071,3 @@ if __name__ == "__main__":
 
 else:
     pass
-#sys.exit("Program End")
-
-
-
-

@@ -10,8 +10,19 @@ d= {"avocado": "AGUACATE SUPREMO", "banana":"PLATANO",
     "pineapple": "PINA MIEL SUPREMA PZA", "potato":"PAPA BLANCA", 
     "purpleonion":"CEBOLLA MORADA", "redapple": "MANZANA RED DELICIOUS IMP SUPREMA",
     "redpepper":"PIMIENTO ROJO", "serrano": "CHILE SERRANO", 
-    "tomato": "TOMATE BOLA SUPREMO", "zucchini":"CALABACITA"
-    }
+    "tomato": "TOMATE BOLA SUPREMO", "zucchini":"CALABACITA",
+    "aguacate": "AGUACATE SUPREMO", "platano":"PLATANO", 
+    "zanahoria": "ZANAHORIA","cilantro":"HEB CILANTRO MANOJO",
+    "elote_blanco": "ELOTE BLANCO", "pepino": "PEPINO FRESCO" ,
+    "manzana_golden": "MANZANA GOLDEN IMP SUPREMA", "limon": "LIMON  AGRIO SUPREMO",
+    "mango":"MANGO ATAULFO SUPREMO", "cebolla":"CEBOLLA BCA LIMPIA",
+    "naranja":"NARANJA  SUPREMA", 
+    "papa":"PAPA BLANCA", 
+    "redapple": "MANZANA RED DELICIOUS IMP SUPREMA", 
+    "tomate_bola": "TOMATE BOLA SUPREMO", "calabacita":"CALABACITA",
+    "melon":"MELON SUPREMO","tomate_huaje":"TOMATE HUAJE SUPREMO","papaya":"PAPAYA MARADOL",
+    "jicama":"JICAMA GDE","fresa":"FRESA 1 LB","brocoli":"BROCOLI CORONAS"}
+
 
 F = ["avocado", "orange", "onion"]
 
