@@ -16,8 +16,6 @@ except ImportError:
     import ttk
 
 from tkcalendar import Calendar, DateEntry
-
-
 # Set up environment variables to the azure key and url
 url = os.environ['ACCOUNT_URI'] 
 key = os.environ['ACCOUNT_KEY']
